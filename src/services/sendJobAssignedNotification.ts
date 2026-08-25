@@ -17,14 +17,14 @@ export const sendJobAssignedNotification = async ({
   orderId,
 }: sendJobAssignedNotificationParams) => {
   try {
-    console.log(
-      'Sending push notification...',
-    );
+    // console.log(
+    //   'Sending push notification...',
+    // );
 
-    console.log(
-      'Electrician ID:',
-      electricianId,
-    );
+    // console.log(
+    //   'Electrician ID:',
+    //   electricianId,
+    // );
 
     // Get subscriptions
     const {
@@ -49,19 +49,19 @@ export const sendJobAssignedNotification = async ({
       return false;
     }
 
-    console.log(
-      'Subscriptions found:',
-      subscriptions?.length ?? 0,
-    );
+    // console.log(
+    //   'Subscriptions found:',
+    //   subscriptions?.length ?? 0,
+    // );
 
     if (
       !subscriptions ||
       subscriptions.length === 0
     ) {
-      console.log(
-        'No push subscription found for electrician:',
-        electricianId,
-      );
+      // console.log(
+      //   'No push subscription found for electrician:',
+      //   electricianId,
+      // );
 
       return false;
     }
@@ -76,17 +76,17 @@ export const sendJobAssignedNotification = async ({
         : '/electrician',
     });
 
-    console.log(
-      'Push payload:',
-      payload,
-    );
+    // console.log(
+    //   'Push payload:',
+    //   payload,
+    // );
 
     for (const subscription of subscriptions) {
       try {
-        console.log(
-          'Sending to endpoint:',
-          subscription.endpoint,
-        );
+        // console.log(
+        //   'Sending to endpoint:',
+        //   subscription.endpoint,
+        // );
 
         const result =
           await webpush.sendNotification(
@@ -105,14 +105,14 @@ export const sendJobAssignedNotification = async ({
             payload,
           );
 
-        console.log(
-          'Push notification sent successfully',
-        );
+        // console.log(
+        //   'Push notification sent successfully',
+        // );
 
-        console.log(
-          'Push response:',
-          result.statusCode,
-        );
+        // console.log(
+        //   'Push response:',
+        //   result.statusCode,
+        // );
       } catch (pushError: any) {
         console.error(
           'Push notification failed',
@@ -155,16 +155,16 @@ export const sendJobAssignedNotification = async ({
               subscription.id,
             );
 
-          if (deleteError) {
-            console.error(
-              'Failed to delete expired subscription:',
-              deleteError,
-            );
-          } else {
-            console.log(
-              'Removed expired push subscription',
-            );
-          }
+          // if (deleteError) {
+          //   console.error(
+          //     'Failed to delete expired subscription:',
+          //     deleteError,
+          //   );
+          // } else {
+          //   console.log(
+          //     'Removed expired push subscription',
+          //   );
+          // }
         }
       }
     }

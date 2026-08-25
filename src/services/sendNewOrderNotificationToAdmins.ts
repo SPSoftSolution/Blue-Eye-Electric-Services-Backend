@@ -15,9 +15,9 @@ export const sendNewOrderNotificationToAdmins = async ({
   orderId,
 }: SendNewOrderNotificationParams) => {
   try {
-    console.log(
-      'Sending new order push notification to admins...',
-    );
+    // console.log(
+    //   'Sending new order push notification to admins...',
+    // );
 
     const {
       data: admins,
@@ -58,18 +58,18 @@ export const sendNewOrderNotificationToAdmins = async ({
       return false;
     }
 
-    console.log(
-      'Admin subscriptions found:',
-      subscriptions?.length ?? 0,
-    );
+    // console.log(
+    //   'Admin subscriptions found:',
+    //   subscriptions?.length ?? 0,
+    // );
 
     if (
       !subscriptions ||
       subscriptions.length === 0
     ) {
-      console.log(
-        'No admin push subscriptions found',
-      );
+      // console.log(
+      //   'No admin push subscriptions found',
+      // );
 
       return false;
     }
@@ -84,22 +84,22 @@ export const sendNewOrderNotificationToAdmins = async ({
         : '/admin/orders',
     });
 
-    console.log(
-      'Push payload:',
-      payload,
-    );
+    // console.log(
+    //   'Push payload:',
+    //   payload,
+    // );
 
     for (const subscription of subscriptions) {
       try {
-        console.log(
-          'Sending notification to admin:',
-          subscription.user_id,
-        );
+        // console.log(
+        //   'Sending notification to admin:',
+        //   subscription.user_id,
+        // );
 
-        console.log(
-          'Sending to endpoint:',
-          subscription.endpoint,
-        );
+        // console.log(
+        //   'Sending to endpoint:',
+        //   subscription.endpoint,
+        // );
 
         const result =
           await webpush.sendNotification(
@@ -118,14 +118,14 @@ export const sendNewOrderNotificationToAdmins = async ({
             payload,
           );
 
-        console.log(
-          'Admin push notification sent successfully',
-        );
+        // console.log(
+        //   'Admin push notification sent successfully',
+        // );
 
-        console.log(
-          'Push response:',
-          result.statusCode,
-        );
+        // console.log(
+        //   'Push response:',
+        //   result.statusCode,
+        // );
       } catch (pushError: any) {
         console.error(
           'Admin push notification failed',
@@ -173,16 +173,16 @@ export const sendNewOrderNotificationToAdmins = async ({
               subscription.id,
             );
 
-          if (deleteError) {
-            console.error(
-              'Failed to delete expired admin subscription:',
-              deleteError,
-            );
-          } else {
-            console.log(
-              'Removed expired admin push subscription',
-            );
-          }
+          // if (deleteError) {
+          //   console.error(
+          //     'Failed to delete expired admin subscription:',
+          //     deleteError,
+          //   );
+          // } else {
+          //   console.log(
+          //     'Removed expired admin push subscription',
+          //   );
+          // }
         }
       }
     }

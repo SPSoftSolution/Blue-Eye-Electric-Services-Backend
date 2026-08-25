@@ -18,7 +18,7 @@ export const deleteExpiredOrderPhotos = async () => {
     }
 
     if (!orders || orders.length === 0) {
-      console.log("No expired order photos found.");
+      // console.log("No expired order photos found.");
       return;
     }
 
@@ -63,7 +63,7 @@ export const deleteExpiredOrderPhotos = async () => {
         continue;
       }
 
-      console.log(`Deleted order photos for order ${order.id}`);
+      // console.log(`Deleted order photos for order ${order.id}`);
     }
   } catch (error) {
     console.error("Expired order photo cleanup error:", error);
