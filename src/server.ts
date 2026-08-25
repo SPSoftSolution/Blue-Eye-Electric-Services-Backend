@@ -5,7 +5,7 @@ import cors from 'cors';
 import orderRoutes from './routes/orderRoutes';
 import electricianRoutes from './routes/electricianRoutes';
 import adminRoutes from './routes/adminRoutes';
-import { loginUser } from './controllers/authController';
+import { loginUser, validateToken } from './controllers/authController';
 
 const app = express();
 
@@ -21,6 +21,7 @@ app.use(
 app.use(express.json());
 
 app.post('/api/auth/login', loginUser);
+app.get('/api/auth/validate-token', validateToken);
 
 app.get('/health', (req, res) => {
   res.json({

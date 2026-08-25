@@ -5,6 +5,10 @@ import {
   signInUser,
   UserRole,
 } from '../services/userAuth';
+import {
+  supabaseAdmin,
+  supabaseAuth,
+} from '../config/supabase';
 
 const login = async (
   req: Request,
@@ -72,25 +76,26 @@ const login = async (
       mobileNumber: user.mobile_number,
     };
 
-    if (role === 'electrician') {
-      return res.status(200).json({
-        success: true,
-        message: 'Login successful',
-        token: session.access_token,
-        notification,
-        electrician: {
-          ...profile,
-          status: user.status,
-        },
-      });
-    }
+    // if (role === 'electrician') {
+    //   return res.status(200).json({
+    //     success: true,
+    //     message: 'Login successful',
+    //     token: session.access_token,
+    //     notification,
+    //     electrician: {
+    //       ...profile,
+    //       status: user.status,
+    //     },
+    //   });
+    // }
 
     return res.status(200).json({
       success: true,
       message: 'Login successful',
       token: session.access_token,
       notification,
-      admin: profile,
+      name: profile.name,
+      // admin: profile,
     });
   } catch (error) {
     console.error(`${role} login error:`, error);
@@ -120,4 +125,40 @@ export const loginUser = async (
   }
 
   return login(req, res, role);
+};
+
+export const validateToken = async (
+  req: Request,
+  res: Response,
+) => {
+  const authHeader = req.headers.authorization;
+  const [scheme, token] = authHeader?.split(' ') ?? [];
+
+  if (scheme !== 'Bearer' || !token) {
+    return res.status(200).json({
+      valid: false,
+      role: null,
+    });
+  }
+
+  const { data, error } = await supabaseAuth.auth.getUser(token);
+  const userId = data.user?.id;
+
+  if (error || !userId) {
+    return res.status(200).json({
+      valid: false,
+      role: null,
+    });
+  }
+
+  const { data: user, error: userError } = await supabaseAdmin
+    .from('users')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle();
+
+  return res.status(200).json({
+    valid: !userError && Boolean(user),
+    role: user?.role ?? null,
+  });
 };

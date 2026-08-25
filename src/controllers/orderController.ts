@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
+import { AuthRequest } from '../middleware/authMiddleware';
 import { sendJobAssignedNotification } from '../services/sendJobAssignedNotification';
 import { sendNewOrderNotificationToAdmins } from '../services/sendNewOrderNotificationToAdmins';
 
@@ -92,7 +93,7 @@ export const createOrder = async (
 };
 
 export const getOrders = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
 ) => {
   try {
@@ -120,10 +121,9 @@ export const getOrders = async (
       `)
       .order('created_at', { ascending: false });
 
-    // Filter by customer
-
-    // Filter by electrician
-    if (electricianId) {
+    if (req.user?.role === 'electrician') {
+      query = query.eq('electrician_id', req.user.id);
+    } else if (electricianId) {
       query = query.eq('electrician_id', electricianId);
     }
 

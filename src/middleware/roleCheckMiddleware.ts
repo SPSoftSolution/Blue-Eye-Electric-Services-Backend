@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { AuthRequest } from './authMiddleware';
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 
@@ -8,7 +9,7 @@ const SUPABASE_JWKS = createRemoteJWKSet(
 );
 
 export const requireAdmin = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
@@ -38,6 +39,7 @@ export const requireAdmin = async (
 
     req.user = {
       id: payload.sub,
+      role: 'admin',
     };
 
     next();

@@ -1,5 +1,5 @@
 import webpush from './pushNotificationService';
-import { supabase } from '../config/supabase';
+import { supabaseAdmin } from '../config/supabase';
 
 interface SendNewOrderNotificationParams {
   title: string;
@@ -22,7 +22,7 @@ export const sendNewOrderNotificationToAdmins = async ({
     const {
       data: admins,
       error: adminsError,
-    } = await supabase
+    } = await supabaseAdmin
       .from('users')
       .select('id')
       .eq('role', 'admin');
@@ -39,7 +39,7 @@ export const sendNewOrderNotificationToAdmins = async ({
     const {
       data: subscriptions,
       error,
-    } = await supabase
+    } = await supabaseAdmin
       .from('push_notification')
       .select(
         'id, user_id, endpoint, p256dh, auth',
@@ -163,7 +163,7 @@ export const sendNewOrderNotificationToAdmins = async ({
         ) {
           const {
             error: deleteError,
-          } = await supabase
+          } = await supabaseAdmin
             .from(
               'push_notification',
             )
