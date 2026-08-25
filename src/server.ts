@@ -15,13 +15,30 @@ import { deleteExpiredOrderPhotos } from './helpers/deleteExpiredOrderPhotos';
 
 const app = express();
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://your-frontend.vercel.app',
+];
+
 app.use(
   cors({
-    origin: 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Allow requests without origin
+      // such as Postman/server-to-server requests
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json());
@@ -41,16 +58,17 @@ app.use('/api', orderRoutes);
 app.use('/api', electricianRoutes);
 app.use('/api', adminRoutes);
 
-const PORT = process.env.PORT || 4000;
+const PORT = Number(process.env.PORT) || 4000;
 
-cron.schedule('0 2 * * *', () => {
-  deleteExpiredOrderPhotos();
+cron.schedule('0 2 * * *', async () => {
+  try {
+    await deleteExpiredOrderPhotos();
+    console.log('Expired order photos cleanup completed');
+  } catch (error) {
+    console.error('Expired order photos cleanup failed:', error);
+  }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-// app.listen(PORT, '0.0.0.0', () => {
-//   console.log(`Server running on port ${PORT}`);
-// });
