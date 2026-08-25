@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../middleware/authMiddleware';
@@ -34,11 +35,28 @@ export const createOrder = async (
       });
     }
 
-    const { data, error } = await supabase
+    /*
+     * Get uploaded photos
+     */
+    const uploadedFiles = req.files as
+      | Express.Multer.File[]
+      | { [fieldname: string]: Express.Multer.File[] }
+      | undefined;
+
+    const photos = Array.isArray(uploadedFiles)
+      ? uploadedFiles
+      : [
+          ...(uploadedFiles?.photos ?? []),
+          ...(uploadedFiles?.orderPhotos ?? []),
+        ];
+
+    /*
+     * 1. Create order first
+     * This gives us the order ID.
+     */
+    const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
-        // order_id: orderId,
-
         customer_name: customerName,
         customer_phone: customerPhone,
         customer_address: customerAddress,
@@ -48,16 +66,16 @@ export const createOrder = async (
         service_time: serviceTime,
         description,
         status: 'pending',
-        // No electrician assigned yet
         electrician_id: null,
-        inspection: inspection,
-        service_type: service
+        inspection,
+        service_type: service,
+        photo_urls: [],
       })
       .select('id')
       .single();
 
-    if (error) {
-      console.error('Supabase order error:', error);
+    if (orderError || !order) {
+      console.error('Supabase order error:', orderError);
 
       return res.status(500).json({
         success: false,
@@ -65,12 +83,123 @@ export const createOrder = async (
       });
     }
 
-    // Send notification to all admins
+    const orderId = order.id;
+
+    /*
+     * 2. Upload photos using orderId in the path
+     *
+    * {orderId}/
+    *   photo-uuid.jpg
+    *   photo-uuid.png
+     */
+    const photoPaths: string[] = [];
+    const photoUrls: string[] = [];
+
+    for (const photo of photos) {
+      const extension =
+        photo.originalname
+          .split('.')
+          .pop()
+          ?.toLowerCase() || 'jpg';
+
+      const photoPath = `${orderId}/${crypto.randomUUID()}.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('orderPhotos')
+        .upload(photoPath, photo.buffer, {
+          contentType: photo.mimetype,
+          upsert: false,
+        });
+
+
+      if (uploadError) {
+        console.error(
+          'Order photo upload error:',
+          uploadError,
+        );
+
+        /*
+         * Delete already uploaded photos
+         */
+        if (photoPaths.length > 0) {
+          await supabase.storage
+            .from('orderPhotos')
+            .remove(photoPaths);
+        }
+
+        /*
+         * Delete order because photo upload failed
+         */
+        await supabase
+          .from('orders')
+          .delete()
+          .eq('id', orderId);
+
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to upload order photos',
+        });
+      }
+
+      photoPaths.push(photoPath);
+
+      const { data: publicUrlData } =
+        supabase.storage
+          .from('orderPhotos')
+          .getPublicUrl(photoPath);
+
+      photoUrls.push(publicUrlData.publicUrl);
+    }
+
+    /*
+     * 3. Update order with photo URLs
+     */
+    if (photoUrls.length > 0) {
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          photo_urls: photoUrls,
+        })
+        .eq('id', orderId);
+
+      if (updateError) {
+        console.error(
+          'Order photo URL update error:',
+          updateError,
+        );
+
+        /*
+         * Remove uploaded photos
+         */
+        if (photoPaths.length > 0) {
+          await supabase.storage
+            .from('orderPhotos')
+            .remove(photoPaths);
+        }
+
+        /*
+         * Remove order
+         */
+        await supabase
+          .from('orders')
+          .delete()
+          .eq('id', orderId);
+
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to save order photos',
+        });
+      }
+    }
+
+    /*
+     * 4. Notify admins
+     */
     sendNewOrderNotificationToAdmins({
       title: 'New Order Received',
       message: `New order received from ${customerName}`,
       type: 'NEW_ORDER',
-      orderId: data.id,
+      orderId,
     }).catch((error) => {
       console.error(
         'Background admin notification error:',
@@ -80,7 +209,8 @@ export const createOrder = async (
 
     return res.status(201).json({
       success: true,
-      orderId: data.id,
+      orderId,
+      photoUrls,
     });
   } catch (error) {
     console.error('Create order error:', error);
@@ -116,6 +246,7 @@ export const getOrders = async (
         service_time,
         service_type,
         description,
+        photo_urls,
         status,
         created_at
       `)

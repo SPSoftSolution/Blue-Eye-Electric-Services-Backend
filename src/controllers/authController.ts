@@ -127,6 +127,47 @@ export const loginUser = async (
   return login(req, res, role);
 };
 
+export const forgotPassword = async (
+  req: Request,
+  res: Response,
+) => {
+  const email = String(req.body.email ?? '').trim().toLowerCase();
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email is required',
+    });
+  }
+
+  try {
+    const redirectTo = process.env.PASSWORD_RESET_REDIRECT_URL;
+    const { error } = await supabaseAuth.auth.resetPasswordForEmail(
+      email,
+      redirectTo ? { redirectTo } : undefined,
+    );
+
+    if (error) {
+      console.error('Forgot password error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Unable to process password reset request',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'If an account exists for this email, a password reset link has been sent',
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to process password reset request',
+    });
+  }
+};
+
 export const validateToken = async (
   req: Request,
   res: Response,

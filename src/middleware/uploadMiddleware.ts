@@ -5,6 +5,7 @@ const upload = multer({
 
   limits: {
     fileSize: 5 * 1024 * 1024, // 5 MB
+    files: 5,
   },
 
   fileFilter: (_req, file, cb) => {
@@ -23,7 +24,7 @@ const upload = multer({
       if (!profilePhotoTypes.includes(file.mimetype)) {
         return cb(
           new Error(
-            "Profile photo must be JPG, JPEG or PNG.",
+            "Profile photo must be JPG, JPEG,HEIC, HEIF or PNG.",
           ),
         );
       }
@@ -33,7 +34,17 @@ const upload = multer({
       if (!validIdTypes.includes(file.mimetype)) {
         return cb(
           new Error(
-            "Valid ID must be JPG, JPEG, PNG or PDF.",
+            "Valid ID must be JPG, JPEG, PNG,HEIC, HEIF or PDF.",
+          ),
+        );
+      }
+    }
+
+    if (file.fieldname === "orderPhotos" || file.fieldname === "photos") {
+      if (!profilePhotoTypes.includes(file.mimetype)) {
+        return cb(
+          new Error(
+            "Order photos must be JPG, JPEG, HEIC, HEIF or PNG.",
           ),
         );
       }

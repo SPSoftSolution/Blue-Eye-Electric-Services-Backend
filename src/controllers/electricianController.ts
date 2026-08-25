@@ -3,6 +3,7 @@ import { supabase } from '../config/supabase';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { saveLatestPushSubscription } from '../services/userAuth';
 import { getStoragePathFromUrl } from '../helpers/getStoragePathFromUrl';
+import { fileExistsInBucket } from '../helpers/fileExistsInBucket';
 
 export const getElectricians = async (
   req: Request,
@@ -522,145 +523,169 @@ export const updateElectrician = async (
       [fieldname: string]: Express.Multer.File[];
     };
 
-    /*
-     * --------------------------------
-     * PROFILE PHOTO
-     * --------------------------------
-     */
-    const profilePhoto =
-      files?.profilePhoto?.[0];
+   /*
+ * --------------------------------
+ * PROFILE PHOTO
+ * --------------------------------
+ */
+const profilePhoto = files?.profilePhoto?.[0];
 
-    if (profilePhoto) {
-      if (!existingElectrician.profile_photo_url) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Existing profile photo path not found",
-        });
+if (profilePhoto) {
+  let profilePath: string | null = null;
+
+  /*
+   * Try existing path first
+   */
+  if (existingElectrician.profile_photo_url) {
+    const oldPath = getStoragePathFromUrl(
+      existingElectrician.profile_photo_url,
+      "profile/electricians",
+      true,
+    );
+
+    if (oldPath) {
+      const exists = await fileExistsInBucket(
+        "profile",
+        oldPath,
+      );
+
+      if (exists) {
+        profilePath = oldPath;
       }
-
-      const profilePath =
-        getStoragePathFromUrl(
-          existingElectrician.profile_photo_url,
-          "profile/electrician",
-          true
-        );
-
-      if (!profilePath) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Unable to determine existing profile photo path",
-        });
-      }
-
-      const { error: uploadError } =
-        await supabase.storage
-          .from("profile")
-          .upload(
-            profilePath,
-            profilePhoto.buffer,
-            {
-              contentType:
-                profilePhoto.mimetype,
-              upsert: true,
-            },
-          );
-
-      if (uploadError) {
-        console.error(
-          "Profile photo upload error:",
-          uploadError,
-        );
-
-        return res.status(500).json({
-          success: false,
-          message:
-            "Failed to update profile photo",
-        });
-      }
-
-      /*
-       * Same path => same URL
-       */
-      const { data: publicUrlData } =
-        supabase.storage
-          .from("profile")
-          .getPublicUrl(profilePath);
-
-      updateData.profile_photo_url =
-        publicUrlData.publicUrl;
     }
+  }
+
+  /*
+   * Existing file was not found.
+   * Create a new path.
+   */
+  if (!profilePath) {
+    const profileExtension =
+      profilePhoto.originalname
+        .split(".")
+        .pop()
+        ?.toLowerCase() || "jpg";
+
+        const profileFileName =
+      `${crypto.randomUUID()}.${profileExtension}`;
+    profilePath =`electricians/${profileFileName}`;
+  }
+
+  const { error: uploadError } =
+    await supabase.storage
+      .from("profile")
+      .upload(
+        profilePath,
+        profilePhoto.buffer,
+        {
+          contentType: profilePhoto.mimetype,
+          upsert: true,
+        },
+      );
+
+  if (uploadError) {
+    console.error(
+      "Profile photo upload error:",
+      uploadError,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update profile photo",
+    });
+  }
+
+  const { data: publicUrlData } =
+    supabase.storage
+      .from("profile")
+      .getPublicUrl(profilePath);
+
+  updateData.profile_photo_url =
+    publicUrlData.publicUrl;
+}
 
     /*
-     * --------------------------------
-     * VALID ID
-     * --------------------------------
-     */
-    const validId =
-      files?.validId?.[0];
+ * --------------------------------
+ * VALID ID
+ * --------------------------------
+ */
+const validId = files?.validId?.[0];
 
-    if (validId) {
-      if (!existingElectrician.valid_id_url) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Existing valid ID path not found",
-        });
+if (validId) {
+  let validIdPath: string | null = null;
+
+  /*
+   * Try existing path first
+   */
+  if (existingElectrician.valid_id_url) {
+    const oldPath = getStoragePathFromUrl(
+      existingElectrician.valid_id_url,
+      "documents/electricians",
+      false,
+    );
+
+    if (oldPath) {
+      const exists = await fileExistsInBucket(
+        "documents",
+        oldPath,
+      );
+
+      if (exists) {
+        validIdPath = oldPath;
       }
-
-      const validIdPath =
-        getStoragePathFromUrl(
-          existingElectrician.valid_id_url,
-          "documents/electrician",
-          false
-        );
-
-      if (!validIdPath) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Unable to determine existing valid ID path",
-        });
-      }
-
-      const { error: uploadError } =
-        await supabase.storage
-          .from("documents")
-          .upload(
-            validIdPath,
-            validId.buffer,
-            {
-              contentType:
-                validId.mimetype,
-              upsert: true,
-            },
-          );
-
-      if (uploadError) {
-        console.error(
-          "Valid ID upload error:",
-          uploadError,
-        );
-
-        return res.status(500).json({
-          success: false,
-          message:
-            "Failed to update valid ID",
-        });
-      }
-
-      /*
-       * Same path => same URL
-       */
-      const { data: publicUrlData } =
-        supabase.storage
-          .from("documents")
-          .getPublicUrl(validIdPath);
-
-      updateData.valid_id_url =
-        publicUrlData.publicUrl;
     }
+  }
+
+  /*
+   * Existing file was not found.
+   * Create a new path.
+   */
+  if (!validIdPath) {
+    const validIdExtension =
+      validId.originalname
+        .split(".")
+        .pop()
+        ?.toLowerCase() || "jpg";
+
+        const validIdFileName =
+      `${crypto.randomUUID()}.${validIdExtension}`;
+        
+    validIdPath =
+      `electricians/${validIdFileName}`;
+  }
+
+  const { error: uploadError } =
+    await supabase.storage
+      .from("documents")
+      .upload(
+        validIdPath,
+        validId.buffer,
+        {
+          contentType: validId.mimetype,
+          upsert: true,
+        },
+      );
+
+  if (uploadError) {
+    console.error(
+      "Valid ID upload error:",
+      uploadError,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update valid ID",
+    });
+  }
+
+  const { data: publicUrlData } =
+    supabase.storage
+      .from("documents")
+      .getPublicUrl(validIdPath);
+
+  updateData.valid_id_url =
+    publicUrlData.publicUrl;
+}
 
     /*
      * Nothing to update
