@@ -3,6 +3,7 @@ import {
   findDistance,
 } from '../controllers/adminController';
 import { loginAs } from '../controllers/authController';
+import { requireAdmin } from '../middleware/roleCheckMiddleware';
 
 const router = Router();
 
@@ -12,6 +13,7 @@ router.post(
 );
 router.get(
   '/admin/findDistance',
+  requireAdmin,
   findDistance
 );
 

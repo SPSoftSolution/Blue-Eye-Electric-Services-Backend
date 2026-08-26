@@ -49,9 +49,10 @@ export const findDistance = async (
     } = await supabase
       .from('users')
       .select(
-        'id, name, latitude, longitude',
+        'id, name, latitude, longitude, status',
       )
       .eq('role', 'electrician')
+      .eq('status','approved')
       .not('latitude', 'is', null)
       .not('longitude', 'is', null);
 
