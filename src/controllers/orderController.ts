@@ -230,7 +230,69 @@ export const getOrders = async (
     const {
       electricianId,
       status,
+      month,
+      year,
     } = req.query;
+
+    const hasMonth = month !== undefined;
+    const hasYear = year !== undefined;
+
+    if (hasMonth !== hasYear) {
+      return res.status(400).json({
+        success: false,
+        message: 'Month and year must be provided together',
+      });
+    }
+
+    let startDate: Date;
+    let endDate: Date;
+
+    if (hasMonth && hasYear) {
+      if (
+        typeof month !== 'string' ||
+        typeof year !== 'string' ||
+        !/^\d{1,2}$/.test(month) ||
+        !/^\d{4}$/.test(year)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Month must be 1-12 and year must be a four-digit year',
+        });
+      }
+
+      const monthNumber = Number(month);
+      const yearNumber = Number(year);
+
+      if (monthNumber < 1 || monthNumber > 12) {
+        return res.status(400).json({
+          success: false,
+          message: 'Month must be between 1 and 12',
+        });
+      }
+
+      startDate = new Date(0);
+      startDate.setFullYear(yearNumber, monthNumber - 1, 1);
+      startDate.setHours(0, 0, 0, 0);
+
+      endDate = new Date(startDate);
+      endDate.setMonth(endDate.getMonth() + 1);
+    } else {
+      const currentDate = new Date();
+
+      startDate = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1,
+      );
+      endDate = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        1,
+      );
+    }
+
+    const formatDate = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
     let query = supabase
       .from('orders')
@@ -248,9 +310,14 @@ export const getOrders = async (
         description,
         photo_urls,
         status,
+        mode_of_payment,
+        payment_details,
+        total_amount,
         created_at
       `)
-      .order('created_at', { ascending: false });
+      .gte('created_at', formatDate(startDate))
+      .lt('created_at', formatDate(endDate));
+      // .order('created_at', { ascending: false });
 
     if (req.user?.role === 'electrician') {
       query = query.eq('electrician_id', req.user.id);
@@ -433,6 +500,10 @@ export const orderCompleted = async (
 ) => {
   try {
     const { orderId } = req.params;
+    const {
+      mode_of_payment,
+      payment_details,
+    } = req.body;
 
     if (typeof orderId !== 'string' || !orderId) {
       return res.status(400).json({
@@ -466,6 +537,53 @@ export const orderCompleted = async (
       });
     }
 
+    if (
+      mode_of_payment !== 'cash' &&
+      mode_of_payment !== 'UPI'
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'mode_of_payment must be either cash or UPI',
+      });
+    }
+
+    if (
+      !Array.isArray(payment_details) ||
+      payment_details.length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'payment_details must contain at least one item',
+      });
+    }
+
+    const hasInvalidPayment = payment_details.some(
+      (payment) =>
+        !payment ||
+        typeof payment !== 'object' ||
+        typeof payment.description !== 'string' ||
+        !payment.description.trim() ||
+        (typeof payment.amount !== 'number' &&
+          typeof payment.amount !== 'string') ||
+        payment.amount === '' ||
+        Number.isNaN(Number(payment.amount)) ||
+        Number(payment.amount) < 0,
+    );
+
+    if (hasInvalidPayment) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Each payment detail must include description and a valid amount',
+      });
+    }
+
+    const totalAmount = payment_details.reduce(
+      (total: number, payment: { amount: number | string }) =>
+        total + Number(payment.amount),
+      0,
+    );
+
     // Update order status
     const {
       data,
@@ -474,9 +592,14 @@ export const orderCompleted = async (
       .from('orders')
       .update({
         status: 'completed',
+        mode_of_payment: mode_of_payment,
+        payment_details: payment_details,
+        total_amount: totalAmount,
       })
       .eq('id', orderId)
-      .select('id, status')
+      .select(
+        'id, status, mode_of_payment, payment_details, total_amount',
+      )
       .single();
 
     if (updateError) {
