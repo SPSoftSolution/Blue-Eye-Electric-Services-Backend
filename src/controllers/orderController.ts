@@ -21,6 +21,7 @@ export const createOrder = async (
       serviceDate,
       serviceTime,
       description,
+      isProjectDiscussion
     } = req.body;
 
     // Validate required fields
@@ -69,6 +70,7 @@ export const createOrder = async (
         electrician_id: null,
         inspection,
         service_type: service,
+        is_project_discussion: isProjectDiscussion,
         photo_urls: [],
       })
       .select('id')
@@ -230,107 +232,120 @@ export const getOrders = async (
     const {
       electricianId,
       status,
-      month,
-      year,
+      page,
+      limit,
+      isProjectDiscussion,
     } = req.query;
 
-    const hasMonth = month !== undefined;
-    const hasYear = year !== undefined;
+    const parsedPage = Number(
+      Array.isArray(page) ? page[0] : page ?? 1,
+    );
 
-    if (hasMonth !== hasYear) {
+    const parsedLimit = Number(
+      Array.isArray(limit) ? limit[0] : limit ?? 10,
+    );
+
+    if (!Number.isInteger(parsedPage) || parsedPage < 1) {
       return res.status(400).json({
         success: false,
-        message: 'Month and year must be provided together',
+        message: 'Page must be a positive integer',
       });
     }
 
-    let startDate: Date;
-    let endDate: Date;
-
-    if (hasMonth && hasYear) {
-      if (
-        typeof month !== 'string' ||
-        typeof year !== 'string' ||
-        !/^\d{1,2}$/.test(month) ||
-        !/^\d{4}$/.test(year)
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: 'Month must be 1-12 and year must be a four-digit year',
-        });
-      }
-
-      const monthNumber = Number(month);
-      const yearNumber = Number(year);
-
-      if (monthNumber < 1 || monthNumber > 12) {
-        return res.status(400).json({
-          success: false,
-          message: 'Month must be between 1 and 12',
-        });
-      }
-
-      startDate = new Date(0);
-      startDate.setFullYear(yearNumber, monthNumber - 1, 1);
-      startDate.setHours(0, 0, 0, 0);
-
-      endDate = new Date(startDate);
-      endDate.setMonth(endDate.getMonth() + 1);
-    } else {
-      const currentDate = new Date();
-
-      startDate = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        1,
-      );
-      endDate = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth() + 1,
-        1,
-      );
+    if (
+      !Number.isInteger(parsedLimit) ||
+      parsedLimit < 1 ||
+      parsedLimit > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Limit must be between 1 and 100',
+      });
     }
 
-    const formatDate = (date: Date) =>
-      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const offset = (parsedPage - 1) * parsedLimit;
 
     let query = supabase
       .from('orders')
-      .select(`
-        id,
-        electrician_id,
-        customer_name,
-        customer_phone,
-        customer_address,
-        latitude,
-        longitude,
-        service_date,
-        service_time,
-        service_type,
-        description,
-        photo_urls,
-        status,
-        mode_of_payment,
-        payment_details,
-        total_amount,
-        created_at
-      `)
-      .gte('created_at', formatDate(startDate))
-      .lt('created_at', formatDate(endDate));
-      // .order('created_at', { ascending: false });
+      .select(
+        `
+          id,
+          electrician_id,
+          customer_name,
+          customer_phone,
+          customer_address,
+          latitude,
+          longitude,
+          service_date,
+          service_time,
+          service_type,
+          description,
+          photo_urls,
+          status,
+          mode_of_payment,
+          payment_details,
+          total_amount,
+          is_project_discussion,
+          created_at
+        `,
+        { count: 'exact' },
+      )
+      .order('created_at', { ascending: false })
+      .range(offset, offset + parsedLimit - 1);
 
+    /*
+     * Electrician can only see their own orders
+     */
     if (req.user?.role === 'electrician') {
       query = query.eq('electrician_id', req.user.id);
-    } else if (electricianId) {
+    } else if (
+      typeof electricianId === 'string' &&
+      electricianId
+    ) {
       query = query.eq('electrician_id', electricianId);
     }
 
-    // Filter by order status
-    if (status) {
+    /*
+     * Filter by status only when provided
+     */
+    if (typeof status === 'string' && status) {
       query = query.eq('status', status);
     }
 
-    const { data, error } = await query;
+    /*
+     * Filter by project discussion only when provided
+     *
+     * ?isProjectDiscussion=true
+     *    -> is_project_discussion = true
+     *
+     * ?isProjectDiscussion=false
+     *    -> is_project_discussion = false
+     *
+     * No parameter
+     *    -> don't filter, return all orders
+     */
+    if (
+      typeof isProjectDiscussion === 'string' &&
+      isProjectDiscussion !== ''
+    ) {
+      if (
+        isProjectDiscussion !== 'true' &&
+        isProjectDiscussion !== 'false'
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'isProjectDiscussion must be true or false',
+        });
+      }
+
+      query = query.eq(
+        'is_project_discussion',
+        isProjectDiscussion === 'true',
+      );
+    }
+
+    const { data, error, count } = await query;
 
     if (error) {
       console.error('Supabase get orders error:', error);
@@ -341,9 +356,23 @@ export const getOrders = async (
       });
     }
 
+    const total = count ?? 0;
+    const totalPages =
+      total === 0
+        ? 0
+        : Math.ceil(total / parsedLimit);
+
     return res.status(200).json({
       success: true,
-      orders: data,
+      orders: data ?? [],
+      pagination: {
+        page: parsedPage,
+        limit: parsedLimit,
+        total,
+        totalPages,
+        hasNextPage: parsedPage < totalPages,
+        hasPrevPage: parsedPage > 1,
+      },
     });
   } catch (error) {
     console.error('Get orders error:', error);
