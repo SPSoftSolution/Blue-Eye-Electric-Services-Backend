@@ -16,8 +16,7 @@ import { deleteExpiredOrderPhotos } from './helpers/deleteExpiredOrderPhotos';
 const app = express();
 
 const allowedOrigins = [
-  'http://localhost:5173',
-  'https://blue-eye-electric-services-blue.vercel.app',
+  'https://www.blueeyeelectric.com/',
 ];
 
 app.use(
