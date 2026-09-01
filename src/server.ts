@@ -16,7 +16,7 @@ import { deleteExpiredOrderPhotos } from './helpers/deleteExpiredOrderPhotos';
 const app = express();
 
 const allowedOrigins = [
-  'https://www.blueeyeelectric.com/',
+  'https://www.blueeyeelectric.com',
 ];
 
 app.use(
